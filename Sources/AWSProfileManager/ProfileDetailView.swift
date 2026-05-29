@@ -79,6 +79,16 @@ struct ProfileDetailView: View {
                     }
                 }
                 .help("Run aws sts get-caller-identity to confirm the session")
+                Button {
+                    Task { await model.openConsole(profileNamed: profile.name) }
+                } label: {
+                    if model.openingConsole.contains(profile.name) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Open Console")
+                    }
+                }
+                .help("Open the AWS web console signed in as this profile")
                 Button("Edit") { model.beginEdit(profileNamed: profile.name) }
                 Button("Delete", role: .destructive) { confirmingDelete = true }
             }

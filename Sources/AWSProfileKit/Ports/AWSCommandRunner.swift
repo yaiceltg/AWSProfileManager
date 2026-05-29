@@ -21,6 +21,10 @@ public protocol AWSCommandRunner: Sendable {
     /// the profile's credentials authenticate as.
     /// - Throws: `AWSCommandError` if not authenticated or the binary is missing.
     func callerIdentity(profileNamed name: String) async throws -> CallerIdentity
+
+    /// Run `aws configure export-credentials --profile <name>` to resolve the
+    /// profile's current credentials (for federated console sign-in).
+    func exportCredentials(profileNamed name: String) async throws -> TemporaryCredentials
 }
 
 public enum AWSCommandError: Error, Equatable, Sendable {

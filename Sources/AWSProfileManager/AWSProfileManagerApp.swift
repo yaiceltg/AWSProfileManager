@@ -23,6 +23,7 @@ struct AWSProfileManagerApp: App {
             deleteProfile: DeleteProfile(repository: repository),
             refreshSession: RefreshSSOSession(runner: runner),
             getCallerIdentity: GetCallerIdentity(runner: runner),
+            openConsole: OpenConsole(runner: runner, federation: AWSConsoleFederation()),
             resolveBrowser: ResolveSelectedBrowser(store: preferenceStore, provider: browserProvider),
             sync: sync,
             browserProvider: browserProvider,

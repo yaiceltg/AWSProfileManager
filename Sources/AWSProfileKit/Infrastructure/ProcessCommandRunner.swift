@@ -37,15 +37,35 @@ public struct ProcessCommandRunner: AWSCommandRunner {
     }
 
     public func callerIdentity(profileNamed name: String) async throws -> CallerIdentity {
+        let json = try await runJSON(
+            arguments: ["sts", "get-caller-identity", "--profile", name, "--output", "json"]
+        )
+        guard let identity = CallerIdentity(json: json) else {
+            throw AWSCommandError.nonZeroExit(code: 0, stderr: "Could not parse get-caller-identity output.")
+        }
+        return identity
+    }
+
+    public func exportCredentials(profileNamed name: String) async throws -> TemporaryCredentials {
+        let json = try await runJSON(
+            arguments: ["configure", "export-credentials", "--profile", name, "--format", "process"]
+        )
+        guard let credentials = TemporaryCredentials(json: json) else {
+            throw AWSCommandError.nonZeroExit(code: 0, stderr: "Could not parse export-credentials output.")
+        }
+        return credentials
+    }
+
+    /// Runs a CLI command capturing stdout, throwing on a non-zero exit.
+    private func runJSON(arguments: [String]) async throws -> String {
         guard let binary = binaryPath ?? AWSPaths.resolveAWSBinary() else {
             throw AWSCommandError.binaryNotFound
         }
-
-        let json = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: binary)
-                process.arguments = ["sts", "get-caller-identity", "--profile", name, "--output", "json"]
+                process.arguments = arguments
 
                 var environment = ProcessInfo.processInfo.environment
                 let existingPath = environment["PATH"] ?? ""
@@ -79,11 +99,6 @@ public struct ProcessCommandRunner: AWSCommandRunner {
                 }
             }
         }
-
-        guard let identity = CallerIdentity(json: json) else {
-            throw AWSCommandError.nonZeroExit(code: 0, stderr: "Could not parse get-caller-identity output.")
-        }
-        return identity
     }
 
     private static func run(

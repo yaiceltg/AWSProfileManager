@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AppKit
 import AWSProfileKit
 
 /// Coordinates the whole app: loads the overview, drives CRUD, refresh, default
@@ -26,6 +27,7 @@ final class AppModel {
 
     // MARK: Transient UI state
     private(set) var refreshingProfiles: Set<String> = []
+    private(set) var openingConsole: Set<String> = []
     private(set) var identityByName: [String: VerifyState] = [:]
     var activeLogin: LoginSession?
     var editing: ProfileFormModel?
@@ -50,6 +52,7 @@ final class AppModel {
     private let deleteProfileUseCase: DeleteProfile
     private let refreshSession: RefreshSSOSession
     private let getCallerIdentity: GetCallerIdentity
+    private let openConsoleUseCase: OpenConsole
     private let resolveBrowser: ResolveSelectedBrowser
     private let sync: SyncManifest
     private let browserProvider: BrowserProvider
@@ -62,6 +65,7 @@ final class AppModel {
         deleteProfile: DeleteProfile,
         refreshSession: RefreshSSOSession,
         getCallerIdentity: GetCallerIdentity,
+        openConsole: OpenConsole,
         resolveBrowser: ResolveSelectedBrowser,
         sync: SyncManifest,
         browserProvider: BrowserProvider,
@@ -73,6 +77,7 @@ final class AppModel {
         self.deleteProfileUseCase = deleteProfile
         self.refreshSession = refreshSession
         self.getCallerIdentity = getCallerIdentity
+        self.openConsoleUseCase = openConsole
         self.resolveBrowser = resolveBrowser
         self.sync = sync
         self.browserProvider = browserProvider
@@ -168,6 +173,36 @@ final class AppModel {
     }
 
     func identity(for name: String) -> VerifyState? { identityByName[name] }
+
+    /// Open the AWS web console signed in as this profile (federated sign-in).
+    func openConsole(profileNamed name: String) async {
+        openingConsole.insert(name)
+        defer { openingConsole.remove(name) }
+        do {
+            let region = profilesByName[name]?.region
+            let url = try await openConsoleUseCase(profileNamed: name, region: region)
+            openInBrowser(url)
+            errorMessage = nil
+        } catch ConsoleSignInError.requiresTemporaryCredentials {
+            errorMessage = "Console sign-in needs temporary credentials. Refresh the SSO session first."
+        } catch let AWSCommandError.nonZeroExit(_, stderr) {
+            errorMessage = "Could not open console: \(stderr.isEmpty ? "failed to resolve credentials" : stderr)"
+        } catch {
+            errorMessage = "Could not open console: \(error.localizedDescription)"
+        }
+    }
+
+    /// Open a URL in the selected browser, or the system default.
+    private func openInBrowser(_ url: URL) {
+        if let path = resolveBrowser()?.appPath {
+            NSWorkspace.shared.open(
+                [url], withApplicationAt: URL(fileURLWithPath: path),
+                configuration: NSWorkspace.OpenConfiguration()
+            )
+        } else {
+            NSWorkspace.shared.open(url)
+        }
+    }
 
     func save(form: ProfileFormModel) {
         let profile = form.build()
