@@ -118,11 +118,16 @@ public struct ProcessCommandRunner: AWSCommandRunner {
                 return trimTrailingPunctuation(String(token[range.lowerBound...]))
             }
         guard !urls.isEmpty else { return nil }
+        // Prefer the autofill URL (carries ?user_code=…) so the user doesn't
+        // have to type the code into the browser.
+        if let autofill = urls.first(where: { $0.lowercased().contains("user_code") }) {
+            return autofill
+        }
         let preferred = urls.first { candidate in
             let lower = candidate.lowercased()
             return lower.contains("authorize") || lower.contains("oidc")
-                || lower.contains("user_code") || lower.contains("device")
-                || lower.contains("amazonaws")
+                || lower.contains("device") || lower.contains("amazonaws")
+                || lower.contains("awsapps")
         }
         return preferred ?? urls.first
     }

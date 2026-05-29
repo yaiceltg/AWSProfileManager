@@ -40,6 +40,28 @@ final class AuthorizationURLExtractionTests: XCTestCase {
         // A chunk arriving before the URL line should yield nil, not a crash.
         XCTAssertNil(ProcessCommandRunner.extractAuthorizationURL(from: "Attempting to open the"))
     }
+
+    // Real `aws sso login --no-browser` output (CLI v2.19, IAM Identity Center).
+    static let realOutput = """
+    Browser will not be automatically opened.
+    Please visit the following URL:
+
+    https://d-9067baed85.awsapps.com/start/#/device
+
+    Then enter the code:
+
+    STXT-KZLQ
+
+    Alternatively, you may visit the following URL which will autofill the code upon loading:
+    https://d-9067baed85.awsapps.com/start/#/device?user_code=STXT-KZLQ
+    """
+
+    func test_realOutput_prefersAutofillURL() {
+        XCTAssertEqual(
+            ProcessCommandRunner.extractAuthorizationURL(from: Self.realOutput),
+            "https://d-9067baed85.awsapps.com/start/#/device?user_code=STXT-KZLQ"
+        )
+    }
 }
 
 final class UserCodeExtractionTests: XCTestCase {
@@ -64,6 +86,15 @@ final class UserCodeExtractionTests: XCTestCase {
 
     func test_returnsNilWhenNoCode() {
         XCTAssertNil(ProcessCommandRunner.extractUserCode(from: "https://oidc.us-east-1.amazonaws.com/authorize"))
+    }
+
+    func test_realOutput_extractsCodeNotURLFragment() {
+        // The code also appears inside the autofill URL; the standalone line
+        // comes first, so that's what we surface.
+        XCTAssertEqual(
+            ProcessCommandRunner.extractUserCode(from: AuthorizationURLExtractionTests.realOutput),
+            "STXT-KZLQ"
+        )
     }
 }
 
