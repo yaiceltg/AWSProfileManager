@@ -8,12 +8,8 @@ struct SessionStatusBadge: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label).font(.caption).foregroundStyle(.secondary)
         }
         .help(helpText)
     }
@@ -29,18 +25,18 @@ struct SessionStatusBadge: View {
 
     private var label: String {
         switch status {
-        case let .valid(remaining): return "Activo · \(Self.format(remaining))"
-        case let .expiringSoon(remaining): return "Expira pronto · \(Self.format(remaining))"
-        case .expired: return "Expirado"
-        case .unknown: return "Sin token"
+        case let .valid(remaining): return "Active · \(Self.format(remaining))"
+        case let .expiringSoon(remaining): return "Expiring · \(Self.format(remaining))"
+        case .expired: return "Expired"
+        case .unknown: return "No token"
         }
     }
 
     private var helpText: String {
         switch status {
-        case .valid, .expiringSoon: return "Token SSO vigente. Tiempo restante hasta la expiración."
-        case .expired: return "El token SSO expiró. Hacé login para refrescar."
-        case .unknown: return "No hay token en cache para esta sesión."
+        case .valid, .expiringSoon: return "SSO token valid. Time remaining until expiry."
+        case .expired: return "The SSO token expired. Refresh to sign in again."
+        case .unknown: return "No cached token for this session."
         }
     }
 
@@ -50,7 +46,35 @@ struct SessionStatusBadge: View {
         if totalMinutes < 1 { return "<1m" }
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
-        if hours == 0 { return "\(minutes)m" }
-        return "\(hours)h \(minutes)m"
+        return hours == 0 ? "\(minutes)m" : "\(hours)h \(minutes)m"
+    }
+}
+
+/// Small indicator of a profile's drift status vs the app manifest.
+struct DriftBadge: View {
+    let status: DriftStatus
+
+    var body: some View {
+        if let descriptor {
+            Label(descriptor.text, systemImage: descriptor.icon)
+                .font(.caption2)
+                .foregroundStyle(descriptor.color)
+                .help(descriptor.help)
+        }
+    }
+
+    private var descriptor: (text: String, icon: String, color: Color, help: String)? {
+        switch status {
+        case .ok:
+            return nil // no badge when everything is in sync
+        case .modified:
+            return ("Modified", "pencil.circle", .orange, "Changed outside the app since it was last recorded.")
+        case let .broken(reason):
+            return ("Broken", "exclamationmark.triangle", .red, reason)
+        case .removed:
+            return ("Removed", "trash.circle", .red, "Tracked by the app but no longer in the config.")
+        case .untracked:
+            return ("Untracked", "questionmark.circle", .secondary, "Found in the config but not yet recorded by the app.")
+        }
     }
 }

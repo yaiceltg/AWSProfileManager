@@ -23,8 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct AWSProfileManagerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @State private var viewModel: ProfileViewModel
-    @State private var settingsViewModel: SettingsViewModel
+    @State private var model: AppModel
 
     init() {
         let paths = AWSPaths.default
@@ -33,27 +32,24 @@ struct AWSProfileManagerApp: App {
         let runner = ProcessCommandRunner()
         let browserProvider = NSWorkspaceBrowserProvider()
         let preferenceStore = UserDefaultsBrowserPreferenceStore()
+        let sync = SyncManifest(store: JSONManifestStore())
 
-        _viewModel = State(initialValue: ProfileViewModel(
-            loadGroups: LoadProfileGroups(repository: repository, tokenReader: tokenReader),
+        _model = State(initialValue: AppModel(
+            loadOverview: LoadOverview(repository: repository, tokenReader: tokenReader, sync: sync),
             setDefaultProfile: SetDefaultProfile(repository: repository),
+            saveProfile: SaveProfile(repository: repository),
+            deleteProfile: DeleteProfile(repository: repository),
             refreshSession: RefreshSSOSession(runner: runner),
-            resolveBrowser: ResolveSelectedBrowser(store: preferenceStore, provider: browserProvider)
-        ))
-        _settingsViewModel = State(initialValue: SettingsViewModel(
-            provider: browserProvider,
-            store: preferenceStore
+            resolveBrowser: ResolveSelectedBrowser(store: preferenceStore, provider: browserProvider),
+            sync: sync,
+            browserProvider: browserProvider,
+            preferenceStore: preferenceStore
         ))
     }
 
     var body: some Scene {
         WindowGroup("AWS Profiles") {
-            ContentView(viewModel: viewModel)
-        }
-        .windowResizability(.contentSize)
-
-        Settings {
-            SettingsView(model: settingsViewModel)
+            RootView(model: model)
         }
     }
 }
