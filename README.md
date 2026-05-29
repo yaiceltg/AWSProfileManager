@@ -117,3 +117,13 @@ Tools/notarize.sh           # zips, submits, staples, and verifies
 
 After stapling, `spctl -a -vvv -t exec dist/AWSProfileManager.app` reports
 `accepted` and the app opens cleanly on any Mac.
+
+## Package a DMG
+
+```bash
+Tools/make_dmg.sh           # → dist/AWSProfileManager.dmg (signed, notarized, stapled)
+```
+
+Builds a compressed DMG containing the app plus an `/Applications` alias for
+drag-to-install, signs it with Developer ID, notarizes and staples it — ready
+to share or attach to a GitHub Release.
