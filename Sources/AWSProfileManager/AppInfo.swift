@@ -6,8 +6,8 @@ enum AppInfo {
     static let name = "AWS Profile Manager"
 
     static let version: String =
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.3"
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.4"
 
     static let build: String =
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "4"
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "5"
 }
