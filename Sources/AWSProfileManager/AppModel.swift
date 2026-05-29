@@ -153,6 +153,16 @@ final class AppModel {
         }
     }
 
+    /// Rename a group, reassigning every profile currently shown under it.
+    func renameGroup(from oldTitle: String, to newTitle: String) {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != oldTitle,
+              let group = groups.first(where: { $0.title == oldTitle })
+        else { return }
+        sync.renameGroup(to: trimmed, profileNames: group.items.map(\.profile.name))
+        reload()
+    }
+
     /// Distinct group titles currently shown, for the form's group picker.
     var existingGroups: [String] {
         Array(Set(groups.map(\.title))).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }

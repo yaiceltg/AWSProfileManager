@@ -49,6 +49,17 @@ public struct SyncManifest: Sendable {
         store.load().groups
     }
 
+    /// Rename a group: reassign every given profile to `newTitle` in one write.
+    /// Used to rename an existing group; auto-by-prefix profiles passed here
+    /// become manually grouped.
+    public func renameGroup(to newTitle: String, profileNames: [String]) {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        var manifest = store.load()
+        for name in profileNames { manifest.groups[name] = trimmed }
+        store.save(manifest)
+    }
+
     /// Assign (or, with nil/empty, clear) a profile's display group.
     public func setGroup(_ group: String?, for name: String) {
         var manifest = store.load()

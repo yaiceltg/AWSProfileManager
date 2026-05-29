@@ -71,6 +71,24 @@ final class ManifestSyncTests: XCTestCase {
         XCTAssertNil(sync.groups()["prod-acct-1"])
     }
 
+    func test_renameGroupReassignsAllGivenProfiles() {
+        let (store, url) = makeStore(); defer { try? FileManager.default.removeItem(at: url) }
+        let sync = SyncManifest(store: store)
+        sync.setGroup("Fantaz", for: "fantaz-dev")
+        // "fantaz-prod" is auto-grouped (no assignment yet) but renaming includes it.
+        sync.renameGroup(to: "Optimus", profileNames: ["fantaz-dev", "fantaz-prod"])
+        XCTAssertEqual(sync.groups()["fantaz-dev"], "Optimus")
+        XCTAssertEqual(sync.groups()["fantaz-prod"], "Optimus")
+    }
+
+    func test_renameGroupIgnoresBlankTitle() {
+        let (store, url) = makeStore(); defer { try? FileManager.default.removeItem(at: url) }
+        let sync = SyncManifest(store: store)
+        sync.setGroup("Fantaz", for: "a")
+        sync.renameGroup(to: "   ", profileNames: ["a"])
+        XCTAssertEqual(sync.groups()["a"], "Fantaz")
+    }
+
     func test_adoptPreservesGroupAssignments() {
         let (store, url) = makeStore(); defer { try? FileManager.default.removeItem(at: url) }
         let sync = SyncManifest(store: store)

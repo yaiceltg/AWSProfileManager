@@ -4,15 +4,25 @@ import AWSProfileKit
 /// Prefix-grouped profiles plus a Settings entry, driving the detail selection.
 struct SidebarView: View {
     @Bindable var model: AppModel
+    @State private var renameTarget: String?
+    @State private var renameText: String = ""
 
     var body: some View {
         List(selection: $model.selection) {
             ForEach(model.filteredGroups) { group in
-                Section(group.title) {
+                Section {
                     ForEach(group.items) { item in
                         row(for: item)
                             .tag(AppModel.Selection.profile(item.profile.name))
                     }
+                } header: {
+                    Text(group.title)
+                        .contextMenu {
+                            Button("Rename Group…") {
+                                renameText = group.title
+                                renameTarget = group.title
+                            }
+                        }
                 }
             }
 
@@ -22,6 +32,19 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .alert("Rename Group", isPresented: Binding(
+            get: { renameTarget != nil },
+            set: { if !$0 { renameTarget = nil } }
+        )) {
+            TextField("Group name", text: $renameText)
+            Button("Rename") {
+                if let old = renameTarget { model.renameGroup(from: old, to: renameText) }
+                renameTarget = nil
+            }
+            Button("Cancel", role: .cancel) { renameTarget = nil }
+        } message: {
+            Text("All profiles in this group will be relabeled. Auto-grouped profiles become manually grouped.")
+        }
     }
 
     private func row(for item: ProfileDisplayItem) -> some View {
