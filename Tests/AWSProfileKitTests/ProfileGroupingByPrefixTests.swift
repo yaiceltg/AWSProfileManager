@@ -26,6 +26,18 @@ final class ProfileGroupingByPrefixTests: XCTestCase {
         XCTAssertEqual(groups[0].items.count, 2)
     }
 
+    func test_customDisplayNameOverridesDerived() {
+        let groups = ProfileGrouping.grouped(
+            [Profile(name: "fantaz-dev"), Profile(name: "fantaz-prod")],
+            assignments: [:],
+            displayNames: ["fantaz-dev": "Dev Admin"]
+        )
+        let items = groups[0].items
+        XCTAssertEqual(items.first { $0.profile.name == "fantaz-dev" }?.displayName, "Dev Admin")
+        // Others keep the derived name.
+        XCTAssertEqual(items.first { $0.profile.name == "fantaz-prod" }?.displayName, "prod")
+    }
+
     func test_nameWithoutDashBecomesOwnGroup() {
         let groups = ProfileGrouping.byPrefix([Profile(name: "standalone")])
         XCTAssertEqual(groups[0].title, "Standalone")

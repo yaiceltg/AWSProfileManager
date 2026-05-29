@@ -38,24 +38,33 @@ public struct ProfileSnapshot: Codable, Equatable, Sendable {
 /// from the drift snapshots so reassigning a group never reads as a config edit.
 public struct ProfileManifest: Codable, Equatable, Sendable {
     public var profiles: [ProfileSnapshot]
+    /// Profile name → user-assigned display group.
     public var groups: [String: String]
+    /// Profile name → user-assigned display name (shown instead of the key).
+    public var displayNames: [String: String]
 
-    public init(profiles: [ProfileSnapshot] = [], groups: [String: String] = [:]) {
+    public init(
+        profiles: [ProfileSnapshot] = [],
+        groups: [String: String] = [:],
+        displayNames: [String: String] = [:]
+    ) {
         self.profiles = profiles
         self.groups = groups
+        self.displayNames = displayNames
     }
 
     public func snapshot(named name: String) -> ProfileSnapshot? {
         profiles.first { $0.name == name }
     }
 
-    // Backward-compatible decoding: older manifests had no `groups` key.
-    private enum CodingKeys: String, CodingKey { case profiles, groups }
+    // Backward-compatible decoding: older manifests lacked groups/displayNames.
+    private enum CodingKeys: String, CodingKey { case profiles, groups, displayNames }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         profiles = try container.decodeIfPresent([ProfileSnapshot].self, forKey: .profiles) ?? []
         groups = try container.decodeIfPresent([String: String].self, forKey: .groups) ?? [:]
+        displayNames = try container.decodeIfPresent([String: String].self, forKey: .displayNames) ?? [:]
     }
 }
 

@@ -19,6 +19,8 @@ struct ProfileFormView: View {
                         .disabled(!form.isNew)
                         .help(form.isNew ? "The config key, e.g. fantaz-dev" : "Renaming isn't supported; delete and recreate instead.")
 
+                    TextField("Display name", text: $form.displayName, prompt: Text("Optional — shown instead of the key"))
+
                     HStack(spacing: 6) {
                         TextField("Group", text: $form.group, prompt: Text("Automatic (by name prefix)"))
                         Menu {
@@ -37,7 +39,7 @@ struct ProfileFormView: View {
                 } header: {
                     Text("Identity")
                 } footer: {
-                    Text("Group is an app-only label (stored in the manifest, not the config). Leave empty to group automatically by name prefix.")
+                    Text("Display name and group are app-only labels (stored in the manifest, not the config). Leave the display name empty to use the default, and the group empty to group automatically by name prefix.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
 

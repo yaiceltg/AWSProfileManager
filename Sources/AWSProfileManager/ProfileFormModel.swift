@@ -12,6 +12,8 @@ final class ProfileFormModel: Identifiable {
     let originalName: String?
 
     var name: String = ""
+    /// App-only display name shown instead of the key (empty = derived default). Manifest, not config.
+    var displayName: String = ""
     /// App-only display group (empty = automatic by prefix). Persisted in the manifest, not the config.
     var group: String = ""
     // config

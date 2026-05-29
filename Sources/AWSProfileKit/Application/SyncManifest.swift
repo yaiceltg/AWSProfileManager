@@ -49,6 +49,22 @@ public struct SyncManifest: Sendable {
         store.load().groups
     }
 
+    /// Current name → display-name overrides.
+    public func displayNames() -> [String: String] {
+        store.load().displayNames
+    }
+
+    /// Set (or, with nil/empty, clear) a profile's display name override.
+    public func setDisplayName(_ name: String?, for key: String) {
+        var manifest = store.load()
+        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty {
+            manifest.displayNames[key] = name.trimmingCharacters(in: .whitespaces)
+        } else {
+            manifest.displayNames[key] = nil
+        }
+        store.save(manifest)
+    }
+
     /// Rename a group: reassign every given profile to `newTitle` in one write.
     /// Used to rename an existing group; auto-by-prefix profiles passed here
     /// become manually grouped.
@@ -84,6 +100,7 @@ public struct SyncManifest: Sendable {
         var manifest = store.load()
         manifest.profiles.removeAll { $0.name == name }
         manifest.groups[name] = nil
+        manifest.displayNames[name] = nil
         store.save(manifest)
     }
 

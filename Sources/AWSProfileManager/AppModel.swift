@@ -146,6 +146,7 @@ final class AppModel {
         run {
             try saveProfileUseCase(profile)
             sync.setGroup(form.group, for: profile.name)
+            sync.setDisplayName(form.displayName, for: profile.name)
             reload()
             if let live = profilesByName[profile.name] { sync.record(live) }
             editing = nil
@@ -197,6 +198,7 @@ final class AppModel {
         guard let profile = profilesByName[name] else { return }
         let form = ProfileFormModel(editing: profile)
         form.group = sync.groups()[name] ?? ""
+        form.displayName = sync.displayNames()[name] ?? ""
         editing = form
     }
 

@@ -29,9 +29,12 @@ public struct LoadOverview: Sendable {
             statusBySession[session.name] = tokenReader.status(for: session, now: now)
         }
 
+        let displayNames = sync.displayNames()
         return Result(
             profiles: config.profiles,
-            groups: ProfileGrouping.grouped(config.profiles, assignments: sync.groups()),
+            groups: ProfileGrouping.grouped(
+                config.profiles, assignments: sync.groups(), displayNames: displayNames
+            ),
             tokenStatusBySession: statusBySession,
             driftByName: sync.diff(live: config.profiles),
             defaultProfileName: config.defaultProfileName

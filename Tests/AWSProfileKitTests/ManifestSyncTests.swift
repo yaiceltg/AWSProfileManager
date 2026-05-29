@@ -105,6 +105,23 @@ final class ManifestSyncTests: XCTestCase {
         XCTAssertNil(sync.groups()["a"])
     }
 
+    func test_setAndClearDisplayName() {
+        let (store, url) = makeStore(); defer { try? FileManager.default.removeItem(at: url) }
+        let sync = SyncManifest(store: store)
+        sync.setDisplayName("Dev Admin", for: "fantaz-dev")
+        XCTAssertEqual(sync.displayNames()["fantaz-dev"], "Dev Admin")
+        sync.setDisplayName("", for: "fantaz-dev")
+        XCTAssertNil(sync.displayNames()["fantaz-dev"])
+    }
+
+    func test_forgetClearsDisplayName() {
+        let (store, url) = makeStore(); defer { try? FileManager.default.removeItem(at: url) }
+        let sync = SyncManifest(store: store)
+        sync.setDisplayName("X", for: "a")
+        sync.forget(named: "a")
+        XCTAssertNil(sync.displayNames()["a"])
+    }
+
     func test_doesNotStoreSecretsInManifest() throws {
         let (store, url) = makeStore(); defer { try? FileManager.default.removeItem(at: url) }
         let sync = SyncManifest(store: store)

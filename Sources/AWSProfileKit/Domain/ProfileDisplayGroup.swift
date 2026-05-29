@@ -35,16 +35,20 @@ public enum ProfileGrouping {
         grouped(profiles, assignments: [:])
     }
 
+    /// - Parameters:
+    ///   - assignments: name → manual group (wins over the prefix title).
+    ///   - displayNames: name → display-name override (wins over the derived name).
     public static func grouped(
         _ profiles: [Profile],
-        assignments: [String: String]
+        assignments: [String: String],
+        displayNames: [String: String] = [:]
     ) -> [ProfileDisplayGroup] {
         var orderedTitles: [String] = []
         var buckets: [String: [ProfileDisplayItem]] = [:]
 
         for profile in profiles {
             let title: String
-            let displayName: String
+            var displayName: String
             if let assigned = assignments[profile.name], !assigned.isEmpty {
                 // Manual group: the prefix is no longer meaningful, show full key.
                 title = assigned
@@ -53,6 +57,10 @@ public enum ProfileGrouping {
                 let (prefix, remainder) = split(profile.name)
                 title = titleCase(prefix)
                 displayName = remainder
+            }
+            // A custom display name overrides the derived one.
+            if let custom = displayNames[profile.name], !custom.isEmpty {
+                displayName = custom
             }
 
             if buckets[title] == nil {
