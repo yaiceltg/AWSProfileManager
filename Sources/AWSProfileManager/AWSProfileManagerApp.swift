@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// Composition root: the single place that picks concrete adapters and wires
 /// them into use cases. Swap any adapter here without touching domain or UI.
-@main
+/// Launched from `main.swift` (after CLI-flag handling), not via `@main`.
 struct AWSProfileManagerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model: AppModel
