@@ -7,3 +7,6 @@ xcuserdata/
 
 # Generated icon artifacts (regenerate with Tools/generate_app_icon.swift)
 /Assets/
+
+# Built .app bundle (produced by Tools/build_app.sh)
+/dist/

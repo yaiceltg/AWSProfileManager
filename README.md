@@ -76,8 +76,38 @@ iconutil -c icns Assets/AppIcon.iconset -o Assets/AppIcon.icns
 
 The runtime resource lives at `Sources/AWSProfileManager/Resources/AppIcon.icns`.
 
-## Distribution
+## Build the .app bundle
+
+```bash
+chmod +x Tools/build_app.sh
+Tools/build_app.sh          # release build → dist/AWSProfileManager.app, signed
+```
+
+The script builds in release, assembles `dist/AWSProfileManager.app`
+(Info.plist + executable + icon + the SPM resource bundle), and signs it with
+Developer ID and the hardened runtime. Override the identity with
+`CODESIGN_IDENTITY=...` if needed.
+
+## Notarize
 
 This app **cannot be sandboxed** (it needs to read `~/.aws` and run the CLI), so
-it is **not** App Store eligible. To distribute: package as an `.app`, sign with
-**Developer ID**, and **notarize**.
+it is **not** App Store eligible — distribute it notarized with Developer ID.
+
+One-time: create an app-specific password at <https://appleid.apple.com> and
+store the notary credentials in the keychain:
+
+```bash
+xcrun notarytool store-credentials "AWSPM-Notary" \
+  --apple-id "<your-apple-id-email>" \
+  --team-id QUH3S7GQ36 \
+  --password "<app-specific-password>"
+```
+
+Then:
+
+```bash
+Tools/notarize.sh           # zips, submits, staples, and verifies
+```
+
+After stapling, `spctl -a -vvv -t exec dist/AWSProfileManager.app` reports
+`accepted` and the app opens cleanly on any Mac.
