@@ -52,8 +52,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 final class StatusBarController {
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
+    private let model: AppModel
 
     init(model: AppModel, onOpenWindow: @escaping () -> Void) {
+        self.model = model
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         popover.behavior = .transient
@@ -79,6 +81,9 @@ final class StatusBarController {
         if popover.isShown {
             popover.performClose(sender)
         } else {
+            // Re-read on every open so the panel reflects changes made elsewhere
+            // (the main window, or edits made outside the app).
+            model.reload()
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
