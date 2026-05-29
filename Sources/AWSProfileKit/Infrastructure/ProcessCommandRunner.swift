@@ -2,34 +2,32 @@ import Foundation
 
 /// `AWSCommandRunner` that shells out to the real `aws` binary via `Process`.
 ///
-/// Two flows:
-/// - System default browser → `aws sso login --sso-session X` (CLI opens it).
-/// - Specific browser → `aws sso login --sso-session X --no-browser`; the runner
-///   scrapes the authorization URL from the CLI's output and opens it with
-///   `open -a <app>`, while the CLI keeps waiting on its localhost callback.
+/// Always runs `aws sso login --profile <name> --no-browser`, streams the
+/// combined output to scrape the authorization URL and verification code,
+/// surfaces them through `onPrompt`, and opens the URL with `open` (in the
+/// chosen browser via `-a`, or the system default). The CLI keeps waiting on
+/// its localhost callback until the user authorizes.
 public struct ProcessCommandRunner: AWSCommandRunner {
-    /// Explicit binary path; when nil it is resolved from known locations.
     private let binaryPath: String?
 
     public init(binaryPath: String? = nil) {
         self.binaryPath = binaryPath
     }
 
-    public func login(ssoSessionNamed name: String, browser: BrowserChoice?) async throws {
+    public func login(
+        profileNamed name: String,
+        browser: BrowserChoice?,
+        onPrompt: @escaping @Sendable (LoginPrompt) -> Void
+    ) async throws {
         guard let binary = binaryPath ?? AWSPaths.resolveAWSBinary() else {
             throw AWSCommandError.binaryNotFound
         }
+        let appPath = browser?.appPath
 
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            // Process/Pipe are not Sendable, so everything stays on this queue;
-            // only `continuation` and value-type inputs cross the boundary.
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    if let browser {
-                        try Self.runCapturingBrowser(binary: binary, session: name, browser: browser)
-                    } else {
-                        try Self.runDefaultBrowser(binary: binary, session: name)
-                    }
+                    try Self.run(binary: binary, profile: name, browserAppPath: appPath, onPrompt: onPrompt)
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
@@ -38,117 +36,101 @@ public struct ProcessCommandRunner: AWSCommandRunner {
         }
     }
 
-    // MARK: - Flows
+    private static func run(
+        binary: String,
+        profile: String,
+        browserAppPath: String?,
+        onPrompt: @Sendable (LoginPrompt) -> Void
+    ) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: binary)
+        process.arguments = ["sso", "login", "--profile", profile, "--no-browser"]
 
-    private static func runDefaultBrowser(binary: String, session: String) throws {
-        let process = makeProcess(binary: binary, arguments: ["sso", "login", "--sso-session", session])
-        let stderrPipe = Pipe()
-        process.standardError = stderrPipe
-        process.standardOutput = Pipe()
+        var environment = ProcessInfo.processInfo.environment
+        let existingPath = environment["PATH"] ?? ""
+        environment["PATH"] = existingPath.isEmpty ? "/usr/bin:/bin" : existingPath + ":/usr/bin:/bin"
+        process.environment = environment
 
-        try run(process)
-        let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        try throwIfFailed(process, stderr: String(data: data, encoding: .utf8) ?? "")
-    }
-
-    private static func runCapturingBrowser(binary: String, session: String, browser: BrowserChoice) throws {
-        let process = makeProcess(
-            binary: binary,
-            arguments: ["sso", "login", "--sso-session", session, "--no-browser"]
-        )
-        // Merge stdout+stderr so the URL is captured regardless of which stream
-        // the CLI prints it to.
+        // Merge stdout+stderr so the URL/code are caught regardless of stream.
         let combined = Pipe()
         process.standardOutput = combined
         process.standardError = combined
 
-        try run(process)
-
-        let handle = combined.fileHandleForReading
-        var accumulated = ""
-        var opened = false
-        while true {
-            let chunk = handle.availableData
-            if chunk.isEmpty { break } // EOF
-            accumulated += String(data: chunk, encoding: .utf8) ?? ""
-            if !opened, let url = extractAuthorizationURL(from: accumulated) {
-                openURL(url, inAppAt: browser.appPath)
-                opened = true
-            }
-        }
-        process.waitUntilExit()
-        // Exit 0 without a URL means the token was already valid — not an error.
-        try throwIfFailed(process, stderr: accumulated)
-    }
-
-    // MARK: - Process helpers
-
-    private static func makeProcess(binary: String, arguments: [String]) -> Process {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: binary)
-        process.arguments = arguments
-
-        // A GUI app has a minimal PATH; ensure the CLI and `open` reach helpers.
-        var environment = ProcessInfo.processInfo.environment
-        let existingPath = environment["PATH"] ?? ""
-        environment["PATH"] = existingPath.isEmpty
-            ? "/usr/bin:/bin"
-            : existingPath + ":/usr/bin:/bin"
-        process.environment = environment
-        return process
-    }
-
-    private static func run(_ process: Process) throws {
         do {
             try process.run()
         } catch {
             throw AWSCommandError.binaryNotFound
         }
-    }
 
-    private static func throwIfFailed(_ process: Process, stderr: String) throws {
+        let handle = combined.fileHandleForReading
+        var accumulated = ""
+        var opened = false
+        var reportedCode: String?
+
+        while true {
+            let chunk = handle.availableData
+            if chunk.isEmpty { break } // EOF
+            accumulated += String(data: chunk, encoding: .utf8) ?? ""
+
+            let url = extractAuthorizationURL(from: accumulated)
+            let code = extractUserCode(from: accumulated)
+
+            if let url, !opened {
+                onPrompt(LoginPrompt(verificationURL: url, userCode: code, rawOutput: accumulated))
+                openURL(url, inAppAt: browserAppPath)
+                opened = true
+                reportedCode = code
+            } else if opened, reportedCode == nil, let code {
+                // Code arrived on a later line than the URL.
+                onPrompt(LoginPrompt(
+                    verificationURL: extractAuthorizationURL(from: accumulated),
+                    userCode: code,
+                    rawOutput: accumulated
+                ))
+                reportedCode = code
+            }
+        }
+
+        process.waitUntilExit()
         guard process.terminationStatus != 0 else { return }
         throw AWSCommandError.nonZeroExit(
             code: process.terminationStatus,
-            stderr: stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            stderr: accumulated.trimmingCharacters(in: .whitespacesAndNewlines)
         )
     }
 
-    private static func openURL(_ url: String, inAppAt appPath: String) {
+    private static func openURL(_ url: String, inAppAt appPath: String?) {
         let open = Process()
         open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        open.arguments = ["-a", appPath, url]
+        open.arguments = appPath.map { ["-a", $0, url] } ?? [url]
         try? open.run()
         open.waitUntilExit()
     }
 
-    // MARK: - URL extraction
+    // MARK: - Output parsing
 
     /// Pulls the SSO authorization URL out of the CLI's `--no-browser` output.
-    /// Prefers an AWS auth URL when several links appear; trims trailing
-    /// punctuation that may follow the URL in prose.
     static func extractAuthorizationURL(from text: String) -> String? {
-        let separators = CharacterSet.whitespacesAndNewlines
         let urls = text
-            .components(separatedBy: separators)
+            .components(separatedBy: .whitespacesAndNewlines)
             .compactMap { token -> String? in
-                // Extract from "https://" onward so leading punctuation
-                // (e.g. an opening paren) doesn't disqualify the token.
                 guard let range = token.range(of: "https://") else { return nil }
                 return trimTrailingPunctuation(String(token[range.lowerBound...]))
             }
-
         guard !urls.isEmpty else { return nil }
         let preferred = urls.first { candidate in
             let lower = candidate.lowercased()
-            return lower.contains("authorize")
-                || lower.contains("oidc")
-                || lower.contains("user_code")
-                || lower.contains("device")
+            return lower.contains("authorize") || lower.contains("oidc")
+                || lower.contains("user_code") || lower.contains("device")
                 || lower.contains("amazonaws")
         }
         return preferred ?? urls.first
+    }
+
+    /// Matches an SSO device/confirmation code like `ABCD-EFGH`.
+    static func extractUserCode(from text: String) -> String? {
+        text.range(of: "[A-Z0-9]{4}-[A-Z0-9]{4}", options: .regularExpression)
+            .map { String(text[$0]) }
     }
 
     private static func trimTrailingPunctuation(_ value: String) -> String {

@@ -1,20 +1,26 @@
 import Foundation
 
-/// Launches the AWS CLI. The app never handles credentials itself — it delegates
-/// the entire SSO browser flow to `aws sso login`.
+/// Launches the AWS CLI. The login always runs with `--no-browser` so the
+/// verification URL and code can be surfaced to the user; the runner opens the
+/// URL in the chosen (or system default) browser as a convenience.
 public protocol AWSCommandRunner: Sendable {
-    /// Run the SSO login for a session.
+    /// Run `aws sso login --profile <name> --no-browser`.
     ///
-    /// - Parameter browser: when nil, the CLI opens the system default browser
-    ///   itself. When set, the CLI runs with `--no-browser` and the runner opens
-    ///   the captured authorization URL in that browser via `open -a`.
+    /// - Parameters:
+    ///   - browser: opens the captured URL in this browser; nil = system default.
+    ///   - onPrompt: called (off the main actor) when the verification URL/code
+    ///     are first detected, so the UI can display the copyable code.
     /// - Throws: `AWSCommandError` on a non-zero exit or a missing binary.
-    func login(ssoSessionNamed name: String, browser: BrowserChoice?) async throws
+    func login(
+        profileNamed name: String,
+        browser: BrowserChoice?,
+        onPrompt: @escaping @Sendable (LoginPrompt) -> Void
+    ) async throws
 }
 
 public enum AWSCommandError: Error, Equatable, Sendable {
     /// The `aws` binary could not be located on disk.
     case binaryNotFound
-    /// The CLI exited non-zero. Carries the exit code and captured stderr.
+    /// The CLI exited non-zero. Carries the exit code and captured output.
     case nonZeroExit(code: Int32, stderr: String)
 }

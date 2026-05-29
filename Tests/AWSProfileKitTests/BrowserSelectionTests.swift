@@ -42,6 +42,31 @@ final class AuthorizationURLExtractionTests: XCTestCase {
     }
 }
 
+final class UserCodeExtractionTests: XCTestCase {
+    func test_extractsDeviceCode() {
+        let output = """
+        Then enter the code:
+
+        ABCD-EFGH
+        """
+        XCTAssertEqual(ProcessCommandRunner.extractUserCode(from: output), "ABCD-EFGH")
+    }
+
+    func test_extractsCodeAmidProse() {
+        let output = "Confirm the following code in the browser: 7H2K-9QWZ before continuing."
+        XCTAssertEqual(ProcessCommandRunner.extractUserCode(from: output), "7H2K-9QWZ")
+    }
+
+    func test_ignoresLowercaseAndRegions() {
+        // Region strings and lowercase tokens must not be mistaken for a code.
+        XCTAssertNil(ProcessCommandRunner.extractUserCode(from: "region us-east-1 sso fantaz-dev"))
+    }
+
+    func test_returnsNilWhenNoCode() {
+        XCTAssertNil(ProcessCommandRunner.extractUserCode(from: "https://oidc.us-east-1.amazonaws.com/authorize"))
+    }
+}
+
 final class UserDefaultsBrowserPreferenceStoreTests: XCTestCase {
     private func makeStore() -> (UserDefaultsBrowserPreferenceStore, UserDefaults, String) {
         let suite = "awspm-tests-\(UUID().uuidString)"
