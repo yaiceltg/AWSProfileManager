@@ -1,15 +1,18 @@
 import SwiftUI
+import AppKit
 import AWSProfileKit
 
 struct ProfileDetailView: View {
     @Bindable var model: AppModel
     let profile: Profile
     @State private var confirmingDelete = false
+    @State private var copiedExport = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                exportRow
                 if let error = model.errorMessage { errorBanner(error) }
                 details
             }
@@ -80,6 +83,36 @@ struct ProfileDetailView: View {
                 Button("Delete", role: .destructive) { confirmingDelete = true }
             }
         }
+    }
+
+    // MARK: Export command
+
+    private var exportRow: some View {
+        HStack(spacing: 10) {
+            Text("export AWS_PROFILE=\(profile.name)")
+                .font(.system(.callout, design: .monospaced))
+                .textSelection(.enabled)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            Button {
+                copyExport()
+            } label: {
+                Label(copiedExport ? "Copied" : "Copy", systemImage: copiedExport ? "checkmark" : "doc.on.doc")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(10)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        .help("Copy a shell command to use this profile in your terminal")
+    }
+
+    private func copyExport() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("export AWS_PROFILE=\(profile.name)", forType: .string)
+        copiedExport = true
+        Task { try? await Task.sleep(for: .seconds(1.5)); copiedExport = false }
     }
 
     // MARK: Details

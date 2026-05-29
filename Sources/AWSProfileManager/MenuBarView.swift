@@ -101,6 +101,14 @@ struct MenuBarView: View {
                 Spacer()
 
                 Button {
+                    copy("export AWS_PROFILE=\(name)")
+                } label: {
+                    Image(systemName: "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .help("Copy export AWS_PROFILE")
+
+                Button {
                     Task { await model.verify(profileNamed: name) }
                 } label: {
                     if case .verifying = model.identity(for: name) {
