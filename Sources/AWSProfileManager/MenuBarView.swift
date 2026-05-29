@@ -89,48 +89,82 @@ struct MenuBarView: View {
     private func profileRow(_ item: ProfileDisplayItem) -> some View {
         let name = item.profile.name
         let isDefault = model.defaultProfileName == name
-        return HStack(spacing: 8) {
-            Circle().fill(dotColor(for: item.profile)).frame(width: 7, height: 7)
+        return VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Circle().fill(dotColor(for: item.profile)).frame(width: 7, height: 7)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.displayName)
-                Text(name).font(.caption2).foregroundStyle(.tertiary)
-            }
-
-            Spacer()
-
-            if isDefault {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.accentColor)
-                    .help("Current default")
-            } else {
-                Button {
-                    model.makeDefault(profileNamed: name)
-                } label: {
-                    Image(systemName: "star")
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.displayName)
+                    Text(name).font(.caption2).foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.borderless)
-                .help("Make default")
-            }
 
-            if item.profile.isSSO {
+                Spacer()
+
                 Button {
-                    Task { await model.refresh(profileNamed: name) }
+                    Task { await model.verify(profileNamed: name) }
                 } label: {
-                    if model.refreshingProfiles.contains(name) {
+                    if case .verifying = model.identity(for: name) {
                         ProgressView().controlSize(.small)
                     } else {
-                        Image(systemName: "arrow.triangle.2.circlepath")
+                        Image(systemName: "checkmark.shield")
                     }
                 }
                 .buttonStyle(.borderless)
-                .disabled(model.refreshingProfiles.contains(name))
-                .help("Login / Refresh")
+                .help("Verify (who am I?)")
+
+                if isDefault {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .help("Current default")
+                } else {
+                    Button {
+                        model.makeDefault(profileNamed: name)
+                    } label: {
+                        Image(systemName: "star")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Make default")
+                }
+
+                if item.profile.isSSO {
+                    Button {
+                        Task { await model.refresh(profileNamed: name) }
+                    } label: {
+                        if model.refreshingProfiles.contains(name) {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(model.refreshingProfiles.contains(name))
+                    .help("Login / Refresh")
+                }
+            }
+
+            if let state = model.identity(for: name) {
+                verifyLine(state).padding(.leading, 15)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func verifyLine(_ state: AppModel.VerifyState) -> some View {
+        switch state {
+        case .verifying:
+            EmptyView()
+        case let .ok(identity):
+            Text("✓ acct \(identity.account)" + (identity.roleName.map { " · \($0)" } ?? ""))
+                .font(.caption2).foregroundStyle(.green)
+                .lineLimit(1).truncationMode(.middle)
+        case let .failed(message):
+            Text("✗ \(message)")
+                .font(.caption2).foregroundStyle(.red)
+                .lineLimit(2)
+        }
     }
 
     // MARK: Login banner (inline verification code)

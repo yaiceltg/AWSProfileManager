@@ -36,6 +36,56 @@ public struct ProcessCommandRunner: AWSCommandRunner {
         }
     }
 
+    public func callerIdentity(profileNamed name: String) async throws -> CallerIdentity {
+        guard let binary = binaryPath ?? AWSPaths.resolveAWSBinary() else {
+            throw AWSCommandError.binaryNotFound
+        }
+
+        let json = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: binary)
+                process.arguments = ["sts", "get-caller-identity", "--profile", name, "--output", "json"]
+
+                var environment = ProcessInfo.processInfo.environment
+                let existingPath = environment["PATH"] ?? ""
+                environment["PATH"] = existingPath.isEmpty ? "/usr/bin:/bin" : existingPath + ":/usr/bin:/bin"
+                process.environment = environment
+
+                let stdoutPipe = Pipe()
+                let stderrPipe = Pipe()
+                process.standardOutput = stdoutPipe
+                process.standardError = stderrPipe
+
+                do {
+                    try process.run()
+                } catch {
+                    continuation.resume(throwing: AWSCommandError.binaryNotFound)
+                    return
+                }
+
+                let outData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                let errData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+
+                if process.terminationStatus == 0 {
+                    continuation.resume(returning: String(data: outData, encoding: .utf8) ?? "")
+                } else {
+                    let stderr = String(data: errData, encoding: .utf8) ?? ""
+                    continuation.resume(throwing: AWSCommandError.nonZeroExit(
+                        code: process.terminationStatus,
+                        stderr: stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+                    ))
+                }
+            }
+        }
+
+        guard let identity = CallerIdentity(json: json) else {
+            throw AWSCommandError.nonZeroExit(code: 0, stderr: "Could not parse get-caller-identity output.")
+        }
+        return identity
+    }
+
     private static func run(
         binary: String,
         profile: String,

@@ -22,6 +22,7 @@ struct AWSProfileManagerApp: App {
             saveProfile: SaveProfile(repository: repository),
             deleteProfile: DeleteProfile(repository: repository),
             refreshSession: RefreshSSOSession(runner: runner),
+            getCallerIdentity: GetCallerIdentity(runner: runner),
             resolveBrowser: ResolveSelectedBrowser(store: preferenceStore, provider: browserProvider),
             sync: sync,
             browserProvider: browserProvider,

@@ -26,8 +26,16 @@ final class AppModel {
 
     // MARK: Transient UI state
     private(set) var refreshingProfiles: Set<String> = []
+    private(set) var identityByName: [String: VerifyState] = [:]
     var activeLogin: LoginSession?
     var editing: ProfileFormModel?
+
+    /// Result of a `get-caller-identity` verification for a profile.
+    enum VerifyState: Equatable {
+        case verifying
+        case ok(CallerIdentity)
+        case failed(String)
+    }
 
     // MARK: Settings
     private(set) var browsers: [BrowserChoice] = []
@@ -41,6 +49,7 @@ final class AppModel {
     private let saveProfileUseCase: SaveProfile
     private let deleteProfileUseCase: DeleteProfile
     private let refreshSession: RefreshSSOSession
+    private let getCallerIdentity: GetCallerIdentity
     private let resolveBrowser: ResolveSelectedBrowser
     private let sync: SyncManifest
     private let browserProvider: BrowserProvider
@@ -52,6 +61,7 @@ final class AppModel {
         saveProfile: SaveProfile,
         deleteProfile: DeleteProfile,
         refreshSession: RefreshSSOSession,
+        getCallerIdentity: GetCallerIdentity,
         resolveBrowser: ResolveSelectedBrowser,
         sync: SyncManifest,
         browserProvider: BrowserProvider,
@@ -62,6 +72,7 @@ final class AppModel {
         self.saveProfileUseCase = saveProfile
         self.deleteProfileUseCase = deleteProfile
         self.refreshSession = refreshSession
+        self.getCallerIdentity = getCallerIdentity
         self.resolveBrowser = resolveBrowser
         self.sync = sync
         self.browserProvider = browserProvider
@@ -140,6 +151,23 @@ final class AppModel {
             failLogin(name, message: error.localizedDescription)
         }
     }
+
+    /// Live-verify a profile via get-caller-identity.
+    func verify(profileNamed name: String) async {
+        identityByName[name] = .verifying
+        do {
+            let identity = try await getCallerIdentity(profileNamed: name)
+            identityByName[name] = .ok(identity)
+        } catch let AWSCommandError.nonZeroExit(_, stderr) {
+            identityByName[name] = .failed(stderr.isEmpty ? "Verification failed." : stderr)
+        } catch AWSCommandError.binaryNotFound {
+            identityByName[name] = .failed("aws CLI not found. Install AWS CLI v2 or set AWS_CLI_PATH.")
+        } catch {
+            identityByName[name] = .failed(error.localizedDescription)
+        }
+    }
+
+    func identity(for name: String) -> VerifyState? { identityByName[name] }
 
     func save(form: ProfileFormModel) {
         let profile = form.build()

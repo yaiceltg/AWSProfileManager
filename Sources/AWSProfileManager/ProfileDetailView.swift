@@ -66,6 +66,16 @@ struct ProfileDetailView: View {
                 if model.defaultProfileName != profile.name {
                     Button("Make Default") { model.makeDefault(profileNamed: profile.name) }
                 }
+                Button {
+                    Task { await model.verify(profileNamed: profile.name) }
+                } label: {
+                    if case .verifying = model.identity(for: profile.name) {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Verify")
+                    }
+                }
+                .help("Run aws sts get-caller-identity to confirm the session")
                 Button("Edit") { model.beginEdit(profileNamed: profile.name) }
                 Button("Delete", role: .destructive) { confirmingDelete = true }
             }
@@ -92,6 +102,34 @@ struct ProfileDetailView: View {
                     secretField("Secret access key", profile.secretAccessKey)
                     secretField("Session token", profile.sessionToken)
                 }
+            }
+            if let state = model.identity(for: profile.name) {
+                identitySection(state)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func identitySection(_ state: AppModel.VerifyState) -> some View {
+        section("Identity (live)") {
+            switch state {
+            case .verifying:
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Checking…").foregroundStyle(.secondary)
+                }
+                .font(.callout)
+            case let .failed(message):
+                Label(message, systemImage: "xmark.circle.fill")
+                    .foregroundStyle(.red).font(.callout).textSelection(.enabled)
+            case let .ok(identity):
+                field("Account", identity.account)
+                field("Type", identity.identityType)
+                if identity.roleName != nil { field("Role", identity.roleName) }
+                if identity.sessionName != nil { field("Session", identity.sessionName) }
+                field("ARN", identity.arn)
+                field("User ID", identity.userId)
+                if identity.partition != nil { field("Partition", identity.partition) }
             }
         }
     }

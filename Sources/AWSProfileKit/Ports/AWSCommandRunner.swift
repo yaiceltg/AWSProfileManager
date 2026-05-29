@@ -16,6 +16,11 @@ public protocol AWSCommandRunner: Sendable {
         browser: BrowserChoice?,
         onPrompt: @escaping @Sendable (LoginPrompt) -> Void
     ) async throws
+
+    /// Run `aws sts get-caller-identity --profile <name>`: a live check of who
+    /// the profile's credentials authenticate as.
+    /// - Throws: `AWSCommandError` if not authenticated or the binary is missing.
+    func callerIdentity(profileNamed name: String) async throws -> CallerIdentity
 }
 
 public enum AWSCommandError: Error, Equatable, Sendable {
