@@ -10,6 +10,12 @@ verification code shown for copying.
 > token. Static credentials you enter are written to `~/.aws/credentials` with
 > `0600` permissions; backups are `0600` too.
 
+## Screenshots
+
+| Profiles | New profile | Settings |
+|----------|-------------|----------|
+| ![Profiles list](docs/screenshots/profiles.png) | ![New profile form](docs/screenshots/new-profile.png) | ![Settings](docs/screenshots/settings.png) |
+
 ## Requirements
 
 - macOS 14+
