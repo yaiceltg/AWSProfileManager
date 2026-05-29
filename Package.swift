@@ -11,7 +11,8 @@ let package = Package(
         .executableTarget(
             name: "AWSProfileManager",
             dependencies: ["AWSProfileKit"],
-            path: "Sources/AWSProfileManager"
+            path: "Sources/AWSProfileManager",
+            resources: [.copy("Resources/AppIcon.icns")]
         ),
         // Library: domain + application + infrastructure (framework-agnostic, fully testable).
         .target(

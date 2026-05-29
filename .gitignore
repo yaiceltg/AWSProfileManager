@@ -4,3 +4,6 @@
 xcuserdata/
 *.xcodeproj
 .swiftpm/
+
+# Generated icon artifacts (regenerate with Tools/generate_app_icon.swift)
+/Assets/
