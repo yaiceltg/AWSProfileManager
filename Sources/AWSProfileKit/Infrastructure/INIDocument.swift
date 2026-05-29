@@ -23,6 +23,13 @@ public struct INIDocument: Equatable, Sendable {
         public func value(for key: String) -> String? {
             pairs.first { $0.key == key }?.value
         }
+
+        /// The bracket content as originally written, e.g. `profile fantaz-dev`,
+        /// `sso-session fantaz-dev`, `default`, or `fantaz-dev` (credentials).
+        public var rawHeader: String {
+            if let name, !name.isEmpty { return "\(type) \(name)" }
+            return type
+        }
     }
 
     public let lines: [String]
