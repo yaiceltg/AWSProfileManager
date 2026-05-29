@@ -1,32 +1,8 @@
 import SwiftUI
-import AppKit
 import AWSProfileKit
 
-/// Promotes the process to a regular foreground app and brings it to front.
-///
-/// A SwiftUI executable launched outside an `.app` bundle is otherwise treated
-/// as a background agent (no window, no Dock icon). The proper distribution fix
-/// is bundling; this keeps `swift run` usable during development.
-final class AppDelegate: NSObject, NSApplicationDelegate {
-    func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-
-        // Show the app icon in the Dock even without an .app bundle.
-        if let url = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
-           let icon = NSImage(contentsOf: url) {
-            NSApp.applicationIconImage = icon
-        }
-    }
-
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        true
-    }
-}
-
-/// Composition root: the single place that picks concrete adapters and wires
-/// them into use cases. Swap any adapter here without touching domain or UI.
-/// Launched from `main.swift` (after CLI-flag handling), not via `@main`.
+/// Composition root: builds the AppModel and hands it to the delegate (which
+/// owns the menu bar status item) and the main window. Launched from main.swift.
 struct AWSProfileManagerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model: AppModel
@@ -40,7 +16,7 @@ struct AWSProfileManagerApp: App {
         let preferenceStore = UserDefaultsBrowserPreferenceStore()
         let sync = SyncManifest(store: JSONManifestStore())
 
-        _model = State(initialValue: AppModel(
+        let appModel = AppModel(
             loadOverview: LoadOverview(repository: repository, tokenReader: tokenReader, sync: sync),
             setDefaultProfile: SetDefaultProfile(repository: repository),
             saveProfile: SaveProfile(repository: repository),
@@ -50,12 +26,30 @@ struct AWSProfileManagerApp: App {
             sync: sync,
             browserProvider: browserProvider,
             preferenceStore: preferenceStore
-        ))
+        )
+        appModel.reload()
+        _model = State(initialValue: appModel)
+
+        // The delegate owns the menu bar status item and needs the same model.
+        appDelegate.model = appModel
     }
 
     var body: some Scene {
-        WindowGroup("AWS Profiles") {
+        WindowGroup("AWS Profiles", id: "main") {
             RootView(model: model)
+                .background(WindowOpener(delegate: appDelegate))
         }
+    }
+}
+
+/// Captures SwiftUI's openWindow action so the menu bar can reopen the window.
+private struct WindowOpener: View {
+    let delegate: AppDelegate
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onAppear { delegate.openMainWindow = { openWindow(id: "main") } }
     }
 }
